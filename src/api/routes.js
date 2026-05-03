@@ -23,9 +23,13 @@ router.get('/health', async (req, res) => {
 router.post('/jobs', async (req, res) => {
   try {
     // Validate request body
-    const result = createJobSchema.safeParse({ body: req.body });
+    const result = createJobSchema.safeParse({ body: req.body, priority: req.body.priority });
     if (!result.success) {
-      return res.status(400).json({ error: 'Validation failed', details: result.error.errors });
+      return res.status(400).json({ 
+        error: 'VALIDATION_FAILED', 
+        message: 'The request body does not match the required schema.',
+        details: result.error.errors 
+      });
     }
 
     const { type, payload } = result.data.body;
@@ -39,11 +43,31 @@ router.post('/jobs', async (req, res) => {
     
     res.status(202).json(jobResult);
   } catch (error) {
-    if (error.message.includes('Idempotency Key Violation')) {
-      return res.status(409).json({ error: error.message });
+    if (error.code === 'IDEMPOTENCY_VIOLATION') {
+      return res.status(409).json({ error: error.code, message: error.message });
+    }
+    if (error.code === 'QUEUE_OVERLOADED') {
+      return res.status(503).json({ error: error.code, message: error.message });
     }
     console.error(error);
-    res.status(500).json({ error: 'Internal Server Error' });
+    res.status(500).json({ error: 'INTERNAL_ERROR', message: 'An unexpected error occurred.' });
+  }
+});
+
+// 2.5 List Jobs (Pagination & Filtering)
+router.get('/jobs', async (req, res) => {
+  try {
+    const { status, type, limit, offset } = req.query;
+    const result = await QueueService.listJobs({ 
+      status, 
+      type, 
+      limit: limit ? parseInt(limit) : 10, 
+      offset: offset ? parseInt(offset) : 0 
+    });
+    res.json(result);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'FETCH_FAILED', message: 'Failed to retrieve jobs.' });
   }
 });
 
@@ -52,11 +76,11 @@ router.get('/jobs/:id', async (req, res) => {
   try {
     const status = await QueueService.getJobStatus(req.params.id);
     if (!status) {
-      return res.status(404).json({ error: 'Job not found' });
+      return res.status(404).json({ error: 'JOB_NOT_FOUND', message: `Job with ID ${req.params.id} could not be found.` });
     }
     res.json(status);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch job' });
+    res.status(500).json({ error: 'FETCH_FAILED', message: 'Failed to fetch job status.' });
   }
 });
 

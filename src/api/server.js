@@ -24,14 +24,41 @@ app.use((req, res, next) => {
   next();
 });
 
-// 1. Setup Rate Limiting (Security Hardening)
+// 1. Authentication Middleware (Production Hardening)
+const authMiddleware = (req, res, next) => {
+  const apiKey = req.headers['x-api-key'];
+  const validApiKey = process.env.API_KEY || 'dev-secret-key';
+  
+  if (!apiKey || apiKey !== validApiKey) {
+    return res.status(401).json({
+      error: 'AUTH_REQUIRED',
+      message: 'A valid API key is required to access this resource.'
+    });
+  }
+  next();
+};
+
+// 2. Setup Rate Limiting (Security Hardening)
 const limiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
   max: 100, // Limit each IP to 100 requests per windowMs
-  standardHeaders: true,
-  legacyHeaders: false,
+  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+  message: {
+    error: 'RATE_LIMIT_EXCEEDED',
+    message: 'Too many requests, please try again later.'
+  },
+  handler: (req, res, next, options) => {
+    res.setHeader('Retry-After', Math.ceil(options.windowMs / 1000));
+    res.status(options.statusCode).send(options.message);
+  }
 });
 app.use('/jobs', limiter);
+app.use('/metrics', limiter);
+
+// Apply Auth to sensitive routes
+app.use('/jobs', authMiddleware);
+app.use('/metrics', authMiddleware);
 
 // 2. Setup Bull-Board Dashboard
 const serverAdapter = new ExpressAdapter();

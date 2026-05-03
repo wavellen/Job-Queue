@@ -14,8 +14,9 @@ export class QueueService {
     const jobCount = await jobQueue.getJobCountByTypes(['waiting', 'delayed', 'prioritized']);
     const QUEUE_THRESHOLD = 10000;
     if (jobCount >= QUEUE_THRESHOLD) {
-      const error = new Error('Service Unavailable: Queue capacity reached (Backpressure)');
+      const error = new Error('System under high load. Try again later.');
       error.status = 503;
+      error.code = 'QUEUE_OVERLOADED';
       throw error;
     }
 
@@ -34,7 +35,10 @@ export class QueueService {
         // 23505 is PostgreSQL unique violation error code
         if (dbError.code === '23505') {
           await client.query('ROLLBACK');
-          throw new Error('Idempotency Key Violation: Job ID already exists');
+          const error = new Error('Job ID already exists');
+          error.status = 409;
+          error.code = 'IDEMPOTENCY_VIOLATION';
+          throw error;
         }
         throw dbError;
       }
@@ -55,6 +59,47 @@ export class QueueService {
     } finally {
       client.release();
     }
+  }
+
+  static async listJobs(filters = {}) {
+    const { status, type, limit = 10, offset = 0 } = filters;
+    
+    let query = 'SELECT id, type, status, created_at, updated_at FROM jobs';
+    const values = [];
+    const conditions = [];
+
+    if (status) {
+      conditions.push(`status = $${values.length + 1}`);
+      values.push(status);
+    }
+    if (type) {
+      conditions.push(`type = $${values.length + 1}`);
+      values.push(type);
+    }
+
+    if (conditions.length > 0) {
+      query += ' WHERE ' + conditions.join(' AND ');
+    }
+
+    query += ` ORDER BY created_at DESC LIMIT $${values.length + 1} OFFSET $${values.length + 2}`;
+    values.push(limit, offset);
+
+    const result = await dbPool.query(query, values);
+    
+    // Also get total count for pagination metadata
+    const countQuery = conditions.length > 0 
+      ? `SELECT COUNT(*) FROM jobs WHERE ${conditions.join(' AND ')}`
+      : 'SELECT COUNT(*) FROM jobs';
+    const countResult = await dbPool.query(countQuery, conditions.length > 0 ? values.slice(0, -2) : []);
+    
+    return {
+      data: result.rows,
+      pagination: {
+        total: parseInt(countResult.rows[0].count),
+        limit: parseInt(limit),
+        offset: parseInt(offset)
+      }
+    };
   }
 
   static async getJobStatus(jobId) {

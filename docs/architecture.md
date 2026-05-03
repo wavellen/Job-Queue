@@ -100,3 +100,29 @@ The system protects itself from overwhelming bursts of traffic.
 ### 5.3 Distributed Tracing
 - **Request ID Propagation**: Every request is assigned a unique `x-request-id`.
 - **Visibility**: This ID is propagated into the job metadata and logged by workers, allowing for end-to-end tracing of a single user request through the API into the background processing layer.
+
+## 6. Security (Authentication)
+The system is protected via **API Key Authentication** to ensure only authorized producers can submit or monitor jobs.
+- **Header**: `x-api-key`
+- **Validation**: Requests without a valid key are rejected with a `401 Unauthorized` status and an `AUTH_REQUIRED` error code.
+- **Scope**: Applied to all `/jobs` (submission/listing) and `/metrics` endpoints.
+
+## 7. Standardized Error Responses
+To ensure production maturity, the system returns structured JSON error responses.
+
+| Error Code | HTTP Status | Description |
+| :--- | :--- | :--- |
+| `AUTH_REQUIRED` | 401 | Missing or invalid API key. |
+| `VALIDATION_FAILED` | 400 | Payload does not match Zod schema. |
+| `QUEUE_OVERLOADED` | 503 | Backpressure threshold reached. |
+| `IDEMPOTENCY_VIOLATION` | 409 | Job ID already exists (idempotency key conflict). |
+| `JOB_NOT_FOUND` | 404 | Requested job ID does not exist in DB. |
+| `RATE_LIMIT_EXCEEDED` | 429 | Too many requests from this IP. |
+
+**Example Error Response:**
+```json
+{
+  "error": "QUEUE_OVERLOADED",
+  "message": "System under high load. Try again later."
+}
+```

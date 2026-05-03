@@ -15,6 +15,7 @@ Use this endpoint to offload work to the background.
 
 **Headers:**
 - `Content-Type: application/json`
+- `x-api-key`: **Required**. Your production access key.
 - `x-idempotency-key` (Optional): A unique UUID string. If provided, the system ensures this specific job is only processed once.
 - `x-request-id` (Optional): A tracking ID for distributed tracing. If not provided, the system generates one.
 
@@ -72,17 +73,77 @@ Use this endpoint to offload work to the background.
 
 ---
 
+### [GET] `/jobs` - List All Jobs (Paginated)
+Fetch a list of jobs with filtering options.
+
+**Query Parameters:**
+- `limit` (Optional): Number of jobs to return (default: 10).
+- `offset` (Optional): Number of jobs to skip (default: 0).
+- `status` (Optional): Filter by status (e.g., `pending`, `completed`, `failed`).
+- `type` (Optional): Filter by job type (e.g., `send-email`).
+
+**Response:**
+```json
+{
+  "data": [...],
+  "pagination": {
+    "total": 125,
+    "limit": 10,
+    "offset": 0
+  }
+}
+```
+
+---
+
 ### [GET] `/jobs/:id` - Check Job Status
-Fetch the current state of a job from the database.
+Fetch the current state of a single job from the database.
 
 ---
 
 ### [GET] `/health` - Infrastructure Health
-Verifies connectivity to PostgreSQL and Redis.
+Verifies connectivity to PostgreSQL and Redis. (Publicly accessible).
 
 ---
 
-## 3. Resilience Parameters
+## 3. Integration Example (SDK-style)
+Here is how you can integrate the Job Queue into your application using standard `fetch`.
+
+```javascript
+const JOB_API_URL = 'http://localhost:3000';
+const API_KEY = 'your-secret-key';
+
+async function submitJob(type, payload, idempotencyKey = null) {
+  const headers = {
+    'Content-Type': 'application/json',
+    'x-api-key': API_KEY,
+  };
+
+  if (idempotencyKey) {
+    headers['x-idempotency-key'] = idempotencyKey;
+  }
+
+  const response = await fetch(`${JOB_API_URL}/jobs`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ type, payload }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(`Job submission failed: ${errorData.error} - ${errorData.message}`);
+  }
+
+  return await response.json();
+}
+
+// Usage
+submitJob('send-email', { to: 'user@example.com', subject: 'Hello', body: 'World' })
+  .then(res => console.log('Job enqueued:', res.id))
+  .catch(err => console.error(err));
+```
+
+## 4. Resilience Parameters
 - **Retries:** Every job automatically retries **3 times** on failure.
 - **Backoff:** Uses **Exponential Backoff** (1s, 2s, 4s...) to avoid hammering failing external services.
 - **DLQ:** Jobs that fail all 3 retries are moved to the **Dead Letter Queue (DLQ)** for manual inspection via the UI.
