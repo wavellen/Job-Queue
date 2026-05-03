@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node src/api/server.js",
+    "start": "./start-production.sh",
     "start:worker": "node src/jobs/worker.js",
     "start:events": "node src/jobs/events.js",
     "test:stress": "node src/test/stress-test-native.js",
