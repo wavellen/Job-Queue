@@ -102,3 +102,22 @@ async function enqueue(type, data) {
   return await response.json();
 }
 ```
+
+---
+
+## 7. Strategic Deployment
+
+### When Not to Use This System
+- **Small Apps**: If your async workload is minimal, the infrastructure requirements might outweigh the benefits.
+- **Simple Cron Tasks**: Use built-in cloud schedulers for basic daily tasks.
+- **Strict FIFO Ordering**: For massive scale strict ordering, consider log-based brokers like **Apache Kafka**.
+
+### Cost Considerations
+- **Memory**: Keep job payloads small; Redis memory usage scales with queue depth.
+- **Scaling**: Each worker node consumes CPU/Memory. Monitor usage to optimize costs.
+- **Scale Limits**: If you exceed **1M jobs/day**, consider migrating to a Kafka-based architecture.
+
+## 8. Future Roadmap
+- **Batch Processing**: Coming soon.
+- **Priority Inversion Fixes**: In development.
+- **Multi-Region Support**: Planned.

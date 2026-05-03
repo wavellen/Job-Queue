@@ -77,7 +77,7 @@ flowchart TD
 ## 4. Service Level Objectives (SLOs)
 To maintain the "top 1%" engineering standard, the system adheres to the following performance and reliability targets:
 
-| Metric | SLO Target | measurement |
+| Metric | SLO Target | Measurement |
 | :--- | :--- | :--- |
 | **Job Processing Latency** | **< 2s (P95)** | Time from 'active' to 'completed' for standard jobs. |
 | **Retry Strategy** | **Exponential** | Backoff delays: 1s, 2s, 4s... to protect external services. |
@@ -126,3 +126,23 @@ To ensure production maturity, the system returns structured JSON error response
   "message": "System under high load. Try again later."
 }
 ```
+
+---
+
+## 8. Strategic Insights
+
+### 8.1 When Not to Use This System
+While robust, this architecture is not a silver bullet.
+- **Small Applications**: If you have a low asynchronous workload, the overhead of managing Redis + Postgres might be unnecessary.
+- **Simple Cron Tasks**: For tasks that only need to run once a day at a fixed time, a simple OS-level cron or cloud scheduler is simpler.
+- **Strict Ordering Requirements**: If you require strictly ordered message processing (FIFO) across all instances at massive scale, consider a log-based broker like **Apache Kafka**.
+
+### 8.2 Cost Considerations
+- **Redis Memory**: Memory usage increases linearly with queue size. Large payloads or high retention of completed jobs will increase infrastructure costs.
+- **Worker Scaling**: Scaling workers horizontally increases CPU and memory costs. Optimization of processor logic is key to cost efficiency.
+- **Scale Threshold**: For ultra-high scale operations (>1M jobs/day), the operational cost and complexity of Redis may shift the advantage toward Kafka-based systems.
+
+### 8.3 Future Improvements
+- **Batch Processing**: Implement support for submitting and processing jobs in batches to reduce I/O overhead.
+- **Priority Inversion Handling**: Enhance the scheduler to prevent low-priority jobs from being starved by high-priority jobs.
+- **Multi-Region Setup**: Deploy Redis and Workers across multiple regions for global low-latency and disaster recovery.
