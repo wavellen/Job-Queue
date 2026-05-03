@@ -1,0 +1,49 @@
+config:
+  target: "http://localhost:3000"
+  phases:
+    - duration: 30
+      arrivalRate: 10
+      name: "Warm up"
+    - duration: 60
+      arrivalRate: 50
+      name: "Ramp up load"
+    - duration: 60
+      arrivalRate: 200
+      name: "Sustained high load"
+  payload:
+    # We could inject dynamic data, but static is fine for queue testing
+    # It will generate 200 reqs/sec of mixed job types
+scenarios:
+  - name: "Submit Email Job"
+    weight: 5
+    flow:
+      - post:
+          url: "/jobs"
+          json:
+            type: "send-email"
+            payload:
+              to: "stress@example.com"
+              subject: "Stress Test"
+              body: "Load testing the system."
+  - name: "Submit Image Job"
+    weight: 3
+    flow:
+      - post:
+          url: "/jobs"
+          json:
+            type: "process-image"
+            payload:
+              imageUrl: "http://example.com/image.png"
+              width: 800
+              height: 600
+              format: "jpeg"
+  - name: "Submit Report Job"
+    weight: 2
+    flow:
+      - post:
+          url: "/jobs"
+          json:
+            type: "generate-report"
+            payload:
+              reportType: "daily"
+              userId: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
