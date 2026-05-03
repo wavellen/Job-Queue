@@ -3,8 +3,9 @@
 This document explains how to interact with the Job Queue system, understand its parameters, and manage background jobs effectively.
 
 ## 1. System Access
-- **API Base URL:** `http://localhost:3000`
-- **Job Dashboard (UI):** `http://localhost:3000/ui`
+- **Local API:** `http://localhost:3000`
+- **Cloud API:** `https://your-app-name.up.railway.app`
+- **Job Dashboard (UI):** `/ui` (e.g., `https://your-app.up.railway.app/ui`)
   - Use the UI to monitor real-time queue state, inspect failed jobs, and view completion metrics.
 
 ## 2. API Endpoints
@@ -43,17 +44,6 @@ Use this endpoint to offload work to the background.
 }
 ```
 
-#### C. Generate Report Job
-```json
-{
-  "type": "generate-report",
-  "payload": {
-    "reportType": "monthly",
-    "userId": "f47ac10b-58cc-4372-a567-0e02b2c3d479"
-  }
-}
-```
-
 **Response (202 Accepted):**
 ```json
 {
@@ -67,18 +57,6 @@ Use this endpoint to offload work to the background.
 ### [GET] `/jobs/:id` - Check Job Status
 Fetch the current state of a job from the database.
 
-**Response:**
-```json
-{
-  "id": "8afa4542-1f1f-423a-bed3-8e711f2ff133",
-  "type": "send-email",
-  "status": "completed",
-  "error_message": null,
-  "created_at": "2024-05-03T10:00:00Z",
-  "updated_at": "2024-05-03T10:00:02Z"
-}
-```
-
 ---
 
 ### [GET] `/health` - Infrastructure Health
@@ -90,11 +68,4 @@ Verifies connectivity to PostgreSQL and Redis.
 - **Retries:** Every job automatically retries **3 times** on failure.
 - **Backoff:** Uses **Exponential Backoff** (1s, 2s, 4s...) to avoid hammering failing external services.
 - **DLQ:** Jobs that fail all 3 retries are moved to the **Dead Letter Queue (DLQ)** for manual inspection via the UI.
-- **Rate Limit:** The API is protected by a threshold of **100 requests per minute per IP**. Excess requests receive a `429 Too Many Requests` response.
-
-## 4. Typical Workflow
-1. **Producer (Your App):** Calls `POST /jobs` with a unique `x-idempotency-key`.
-2. **API Layer:** Checks Postgres for duplicates, saves the job as `pending`, and pushes to Redis.
-3. **Worker:** Picks up the job from Redis, executes the logic, and triggers events.
-4. **Event Listener:** Automatically updates the Postgres record to `completed` or `failed`.
-5. **Monitoring:** Admin checks `/ui` to ensure no jobs are stuck in the queue.
+- **Rate Limit:** The API is protected by a threshold of **100 requests per minute per IP**.
