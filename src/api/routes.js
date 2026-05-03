@@ -29,11 +29,13 @@ router.post('/jobs', async (req, res) => {
     }
 
     const { type, payload } = result.data.body;
+    const priority = result.data.priority;
     
     // Accept optional client-provided jobId for idempotency
     const clientJobId = req.headers['x-idempotency-key'];
+    const requestId = req.requestId;
 
-    const jobResult = await QueueService.enqueueJob(type, payload, clientJobId);
+    const jobResult = await QueueService.enqueueJob(type, payload, clientJobId, { priority, requestId });
     
     res.status(202).json(jobResult);
   } catch (error) {

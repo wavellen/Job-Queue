@@ -6,8 +6,19 @@ export class QueueService {
   /**
    * Enqueues a job with two-phase commit strategy for idempotency.
    */
-  static async enqueueJob(type, payload, clientJobId) {
+  static async enqueueJob(type, payload, clientJobId, options = {}) {
+    const { priority, requestId } = options;
     const jobId = clientJobId || uuidv4();
+
+    // 0. Backpressure Handling: Reject jobs if queue is too full
+    const jobCount = await jobQueue.getJobCountByTypes(['waiting', 'delayed', 'prioritized']);
+    const QUEUE_THRESHOLD = 10000;
+    if (jobCount >= QUEUE_THRESHOLD) {
+      const error = new Error('Service Unavailable: Queue capacity reached (Backpressure)');
+      error.status = 503;
+      throw error;
+    }
+
     const client = await dbPool.connect();
     
     try {
@@ -30,10 +41,14 @@ export class QueueService {
 
       // 2. Add to BullMQ
       // Use the DB generated UUID as the BullMQ Job ID to link them
-      await jobQueue.add(type, payload, { jobId });
+      await jobQueue.add(type, payload, { 
+        jobId,
+        priority,
+        metadata: { requestId } // Store requestId for distributed tracing
+      });
 
       await client.query('COMMIT');
-      return { id: jobId, status: 'enqueued' };
+      return { id: jobId, status: 'enqueued', requestId };
     } catch (error) {
       await client.query('ROLLBACK');
       throw error;

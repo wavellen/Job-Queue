@@ -16,6 +16,12 @@ Use this endpoint to offload work to the background.
 **Headers:**
 - `Content-Type: application/json`
 - `x-idempotency-key` (Optional): A unique UUID string. If provided, the system ensures this specific job is only processed once.
+- `x-request-id` (Optional): A tracking ID for distributed tracing. If not provided, the system generates one.
+
+**Body Parameters:**
+- `type`: The job type.
+- `payload`: Data required for the job.
+- `priority` (Optional): Integer between **1 (Highest)** and **5 (Lowest)**. Defaults to no priority (BullMQ default).
 
 **Payload Examples:**
 
@@ -40,6 +46,18 @@ Use this endpoint to offload work to the background.
     "width": 1920,
     "height": 1080,
     "format": "webp"
+  }
+}
+```
+
+#### C. High-Priority Report
+```json
+{
+  "type": "generate-report",
+  "priority": 1,
+  "payload": {
+    "reportType": "daily",
+    "userId": "8afa4542-1f1f-423a-bed3-8e711f2ff133"
   }
 }
 ```

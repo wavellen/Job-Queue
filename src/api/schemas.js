@@ -29,4 +29,5 @@ export const jobPayloadSchema = z.discriminatedUnion('type', [
 
 export const createJobSchema = z.object({
   body: jobPayloadSchema,
+  priority: z.number().int().min(1).max(5).optional(), // 1 = Highest, 5 = Lowest in our abstraction
 });

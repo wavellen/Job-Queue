@@ -74,7 +74,29 @@ flowchart TD
     Redis --> Worker_Tier
 ```
 
-## 3. Tech Stack Justification
-- **Express:** Industry standard, highly robust web framework for the API layer. Chosen for widespread familiarity and ecosystem support.
-- **BullMQ + Redis:** Industry standard for robust job processing in Node.js. Handles all complex queueing logic natively.
-- **PostgreSQL:** Reliable ACID-compliant relational DB for persistent state and auditing.
+## 4. Service Level Objectives (SLOs)
+To maintain the "top 1%" engineering standard, the system adheres to the following performance and reliability targets:
+
+| Metric | SLO Target | measurement |
+| :--- | :--- | :--- |
+| **Job Processing Latency** | **< 2s (P95)** | Time from 'active' to 'completed' for standard jobs. |
+| **Retry Strategy** | **Exponential** | Backoff delays: 1s, 2s, 4s... to protect external services. |
+| **Failure Rate** | **< 1%** | Percentage of jobs ending in DLQ vs total enqueued. |
+| **System Availability** | **99.9%** | API and Worker uptime monitoring. |
+
+## 5. Advanced Reliability Features
+
+### 5.1 Backpressure Handling
+The system protects itself from overwhelming bursts of traffic.
+- **Threshold**: If the combined count of `waiting`, `delayed`, and `prioritized` jobs exceeds **10,000**, the API will reject new submissions with a `503 Service Unavailable` response.
+- **Goal**: Prevents Redis memory exhaustion and ensures the system remains responsive for status checks even under heavy load.
+
+### 5.2 Reconciliation Logic (Self-Healing)
+"DB and Redis may go out of sync" - We fix our own weaknesses.
+- **Periodic Sync**: A reconciliation job runs every **5 minutes**.
+- **Logic**: It scans PostgreSQL for jobs in `pending` state older than 5 minutes. If a job is missing from Redis, it is automatically re-enqueued.
+- **Consistency**: Ensures no job is lost even if the connection to Redis drops between the DB commit and the Redis enqueue.
+
+### 5.3 Distributed Tracing
+- **Request ID Propagation**: Every request is assigned a unique `x-request-id`.
+- **Visibility**: This ID is propagated into the job metadata and logged by workers, allowing for end-to-end tracing of a single user request through the API into the background processing layer.

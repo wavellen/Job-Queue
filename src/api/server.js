@@ -7,12 +7,22 @@ import { ExpressAdapter } from '@bull-board/express';
 import { jobQueue, deadLetterQueue } from '../jobs/queue.js';
 import rateLimit from 'express-rate-limit';
 
+import { v4 as uuidv4 } from 'uuid';
+
 dotenv.config();
 
 const app = express();
 
 // Middleware
 app.use(express.json());
+
+// 0. Distributed Tracing Middleware (Request ID propagation)
+app.use((req, res, next) => {
+  const requestId = req.headers['x-request-id'] || uuidv4();
+  req.requestId = requestId;
+  res.setHeader('x-request-id', requestId);
+  next();
+});
 
 // 1. Setup Rate Limiting (Security Hardening)
 const limiter = rateLimit({
