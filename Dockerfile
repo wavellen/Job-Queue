@@ -6,8 +6,10 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci --only=production
 
-# Copy source code natively since it is plain Javascript
+# Copy source code and startup script
 COPY src/ ./src/
+COPY start-production.sh ./
+RUN chmod +x start-production.sh
 
 # Expose API port
 EXPOSE 3000
