@@ -14,6 +14,7 @@ router.get('/health', async (req, res) => {
     await redisConnection.ping();
     res.json({ status: 'ok', db: 'connected', redis: 'connected' });
   } catch (error) {
+    console.error('Health check failed:', error);
     res.status(500).json({ status: 'error', message: 'Infrastructure unavailable' });
   }
 });
